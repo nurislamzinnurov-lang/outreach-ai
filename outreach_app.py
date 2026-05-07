@@ -10,22 +10,35 @@ st.set_page_config(page_title="AI Outreach Assistant", page_icon="🚀")
 st.title("🚀 AI Outreach Assistant")
 st.markdown("Генерируй персонализированные письма и отправляй их в один клик.")
 
+# --- ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ СЕКРЕТОВ ---
+def get_secret(key, default=""):
+    if key in st.secrets:
+        return st.secrets[key]
+    return default
+
 # --- БОКОВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ---
 with st.sidebar:
     st.header("⚙️ Настройки")
-    groq_key = st.text_input("Groq API Key", type="password", help="Получи на console.groq.com")
+    
+    # Пытаемся взять ключ из Secrets, если нет - просим ввести
+    groq_key = st.text_input("Groq API Key", 
+                            value=get_secret("GROQ_API_KEY"), 
+                            type="password")
     
     st.subheader("📧 Почта (SMTP)")
     smtp_service = st.selectbox("Сервис", ["Yandex", "Mail.ru", "Custom"])
-    email_user = st.text_input("Твой Email")
-    email_pass = st.text_input("Пароль приложения", type="password", help="Не обычный пароль, а пароль для внешних приложений!")
+    
+    email_user = st.text_input("Твой Email", value=get_secret("EMAIL_USER"))
+    email_pass = st.text_input("Пароль приложения", 
+                              value=get_secret("EMAIL_PASS"), 
+                              type="password")
     
     if smtp_service == "Yandex":
         smtp_server, smtp_port = "smtp.yandex.ru", 465
     elif smtp_service == "Mail.ru":
         smtp_server, smtp_port = "smtp.mail.ru", 465
     else:
-        smtp_server = st.text_input("SMTP Server")
+        smtp_server = st.text_input("SMTP Server", value="smtp.yandex.ru")
         smtp_port = st.number_input("SMTP Port", value=465)
 
 # --- ОСНОВНОЙ ИНТЕРФЕЙС ---
@@ -35,17 +48,17 @@ with col1:
     st.subheader("📝 Данные лида")
     lead_name = st.text_input("Имя лида", placeholder="Например: Levan")
     lead_email = st.text_input("Email лида", placeholder="levan@example.com")
-    lead_context = st.text_area("Контекст (инфо о лиде)", placeholder="Например: Founder ORBI Group, строит отель в Батуми...", height=150)
+    lead_context = st.text_area("Контекст (инфо о лиде)", placeholder="Например: Founder ORBI Group...", height=150)
 
 with col2:
     st.subheader("💡 Твой оффер")
-    my_offer = st.text_area("Что предлагаем?", placeholder="Например: Реклама на 1500 экранах Novikov TV...", height=235)
+    my_offer = st.text_area("Что предлагаем?", placeholder="Например: Реклама на 1500 экранах...", height=235)
 
 # --- ЛОГИКА ---
 def generate_email(context, offer, api_key):
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    prompt = f"Напиши короткое холодное письмо (3-4 предложения). Лид: {context}. Оффер: {offer}. Без воды, фокус на выгоде."
+    prompt = f"Напиши короткое холодное письмо (3-4 предложения ). Лид: {context}. Оффер: {offer}. Без воды, фокус на выгоде."
     data = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
@@ -74,7 +87,7 @@ def send_mail(to, subject, body, user, pw, server, port):
 # --- КНОПКИ ---
 if st.button("✨ Сгенерировать письмо"):
     if not groq_key:
-        st.warning("Введи Groq API Key в настройках слева!")
+        st.warning("Введи Groq API Key!")
     else:
         with st.spinner("ИИ думает..."):
             st.session_state.generated_email = generate_email(lead_context, my_offer, groq_key)
@@ -85,7 +98,7 @@ if "generated_email" in st.session_state:
     
     if st.button("🚀 Отправить письмо"):
         if not email_user or not email_pass:
-            st.warning("Настрой почту в боковой панели!")
+            st.warning("Настрой почту!")
         else:
             with st.spinner("Отправка..."):
                 if send_mail(lead_email, f"Quick question for {lead_name}", final_email, email_user, email_pass, smtp_server, smtp_port):
